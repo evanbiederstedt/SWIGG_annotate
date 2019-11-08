@@ -1,3 +1,5 @@
+Note: this is a temporary fork for convenience, in relation to https://github.com/ncBI-codeathons/virus_graphs
+
 <img src="documentation/images/hiv_graph.jpg" align="left" height="150" width="150" ></a> 
 # SWIGG - SWIft Genomes in a Graph
 
