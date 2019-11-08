@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+## revised for Virus_Graph use; to be a future PR to SWIGG...possibly
+
 import argparse
 
 import numpy as np
@@ -41,39 +43,68 @@ required.add_argument("-o", "--out",
                     help='required, path to prefix of output file name. Two files will be created - 1. Edge file ".tsv" and 2. Graph file ".gexf" ',
                     required=True)
 
-########################################################
-# optional args:
-
-# optional.add_argument("--reg",
-#                     help="optional, .....")
-
-# parser._action_groups.append(optional)
 args = parser.parse_args()
 
 ########################################################
+
+## seqq = fasta file name
+## name = name of FASTA file
+## ID = str(list(SeqIO.parse(seqq, "fasta"))[0].id
+## sequence = str(list(SeqIO.parse(seqq, "fasta"))[0].seq
+
+## Required for FASTA annotations:
+## 
+## seq1 [host=human] 
+## 
+
 seq_list = []
 for seqq in args.fasta:
-    seq_list = seq_list + [(seqq, str(list(SeqIO.parse(seqq, "fasta"))[0].seq))]
+    attribute_name = str(list(SeqIO.parse(seqq, "fasta"))[0].description)
+    attribute_name = attribute_name[attribute_name.find("[")+1:attribute_name.rfind("]")].split('=')[0]  ## the first item in [name=value]  ## ONLY ONE CURRENTLY ACCEPTED!!!
+    seq_list = seq_list + [(str(list(SeqIO.parse(seqq, "fasta"))[0].id), str(list(SeqIO.parse(seqq, "fasta"))[0].seq), str(attribute_name) )]
+    
 seq_df = pd.DataFrame(seq_list).head()
-seq_df.columns=['name', 'Sequence']
+seq_df.columns=['ID', 'Sequence', 'Attribute']
 
-# Length of k-mers to search for.
+
+# Length of k-mers to search for
 k_length = int(args.kmer_length)
+
 # Number of minimum strains that a k-mer must be in to be counted
 min_alt_seqs = int(args.threshold)
+
 # Number of minimum strains that a k-mer must be in to be counted.
 repeat_threshold_within = args.repeat_threshold_within
+
 # Number of minimum strains that a k-mer must be in to be counted.
 repeat_threshold_across = int(args.repeat_threshold_across)
 
-# Read in tables and format to dataframe.
-print("Finding all possible kmers...", flush=True)
-kmers = [(i_strain, seq[i_base:(i_base+k_length)], i_base) for i_strain,seq in enumerate(seq_df.Sequence.values) for i_base in range(len(seq)-k_length)]
-kmers_df = pd.DataFrame(kmers, columns = ['alt_seq', 'kmer',  'pos_start'])
-print(str(len(kmers)) + " total possible k-mers of length " + str(k_length), flush=True)
+
+## Here is where we add in the ID names
+## iterate over unique IDs
+
+### ASSUMING THE SAME ATTRIBUTE BY INPUT FASTA FIRST
+
+list_of_dfs = []
+
+for name in seq_df.ID.unique():
+    print("Finding all possible kmers within Sample " + str(name), flush=True)
+    ## subset dataframe
+    subset_df = seq_df.loc[seq_df.ID == name]
+    attribute_name = str(seq_df.loc[seq_df.ID == name].Attribute.unique()[0])
+    kmers = [(name, attribute_name, i_strain, seq[i_base:(i_base+k_length)], i_base) for i_strain, seq in enumerate(subset_df.Sequence.values) for i_base in range(len(seq)-k_length)]
+    kmers_df_subset = pd.DataFrame(kmers, columns = ['ID', 'attribute', 'alt_seq', 'kmer', 'pos_start'])
+    print(str(len(kmers)) + " total possible k-mers of length " + str(k_length) + " for sample " + str(name), flush=True)
+    list_of_dfs.append(kmers_df_subset)
 
 
-## Note: It's very important for the downstream steps that kmers_df is ordered by (alt_seq, pos_start).  If it is not read in in such a way (ie we end up parallelizing this running on GPUs or something, we will need to do:
+## concatenate the list of pandas dataframes
+kmers_df = pd.concat(list_of_dfs)
+
+
+## Note: It's very important for the downstream steps that kmers_df is ordered by (alt_seq, pos_start). 
+## If it is not read in in such a way (ie we end up parallelizing this running on GPUs or something, we will need to do:
+
 # kmers_df = kmers_df.sort_values(['alt_seq', 'pos_start'])
 print("Finding conserved & nonrepeating kmers...")
 kmers_x_in_sequence_y = zip(kmers_df.kmer, kmers_df.alt_seq)
@@ -101,6 +132,7 @@ print("Getting rid of direct neighbor kmers...")
 kmers_df_filt['order'] = range(len(kmers_df_filt))
 kmer_grouped_df_expanded = kmers_df_filt[:-1][(kmers_df_filt.pos_start.values[1:]-kmers_df_filt.pos_start.values[:-1]>k_length) &
                                        (kmers_df_filt.alt_seq.values[1:]==kmers_df_filt.alt_seq[:-1])]
+
 kmer_grouped_df_expanded.head()
 print(str(len(kmer_grouped_df_expanded)) + " distinct kmers.", flush=True)
 
@@ -132,6 +164,22 @@ edges_to_csv=pd.DataFrame(kmers_1)
 edges_to_csv.columns = ['kmer_1']
 edges_to_csv['kmer_2'] = edges_df_group['kmer_2'].apply(lambda x: list(x)[0]).values
 edges_to_csv['distance'] = edges_df_group['distance'].apply(np.mean).values
+
+
+## Hack to match attributes from kmers_df to edges_to_csv
+## Add the Attribute for each k-mer
+
+## Should convert kmers_df to a dictionary, with key and value lists
+
+kmer_dictionary = kmers_df[['kmer', 'attribute']].groupby('kmer')['attribute'].apply(list).to_dict()
+
+for kname in kmer_dictionary.keys():
+    if not edges_to_csv.loc[edges_to_csv.kmer_1 == kname].empty:
+        edges_to_csv.loc[edges_to_csv.kmer_1 == kname, "kmer1_attribute"] = list(kmer_dictionary[kname]) 
+    if not edges_to_csv.loc[edges_to_csv.kmer_2 == kname].empty:       
+    edges_to_csv.loc[edges_to_csv.kmer_2 == kname, "kmer2_attribute"] = list(kmer_dictionary[kname])     
+
+
 edges_to_csv.to_csv(args.out+'.tsv', sep="\t", header=None, index_label=None)
 
 # Creating graph file
