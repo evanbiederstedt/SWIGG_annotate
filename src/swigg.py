@@ -134,7 +134,8 @@ for i in kmers_repeat_too_many_times:
 # Keep kmers that are conserved in >=min_alt_seqs sequences.
 kmers_approx_nonrepeat = kmers_unique_in_one_sequence.difference(kmers_repeat_too_many_times)
 print("OK repetitive-repeat")
-kmers_approx_nonrepeat.to_csv(sys.stdout)
+for i in kmers_approx_nonrepeat:
+  print(i)
 conserved_seqs = set([el for el in kmers_approx_nonrepeat if kmers_x_count[el] >= min_alt_seqs])
 kmers_df_filt = kmers_df[[k in conserved_seqs for k in kmers_df.kmer]]
 print(str(len(kmers_df_filt)) + " conserved/nonrepeating kmers.", flush=True)
