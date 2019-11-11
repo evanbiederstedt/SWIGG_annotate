@@ -111,12 +111,21 @@ print(str(len(kmers)) + " total possible k-mers of length " + str(k_length), flu
 
 ## Note: It's very important for the downstream steps that kmers_df is ordered by (alt_seq, pos_start).  If it is not read in in such a way (ie we end up parallelizing this running on GPUs or something, we will need to do:
 # kmers_df = kmers_df.sort_values(['alt_seq', 'pos_start'])
+kmers_df.to_csv(sys.stdout)
 print("Finding conserved & nonrepeating kmers...")
 kmers_x_in_sequence_y = zip(kmers_df.kmer, kmers_df.alt_seq)
+test_kmers_x_in_sequence_y = zip(kmers_df.kmer, kmers_df.alt_seq)
+print("Zip test")
+for i in list(test_kmers_x_in_sequence_y):
+  print(i)
 # Counts of (alt_seq, kmer) combos -- how many times kmer appears in alt_seq).
 kmers_x_in_sequence_y_counts = Counter(kmers_x_in_sequence_y)
 # How many sequences kmer appears in.
 kmers_x_count = Counter([k[0] for k in kmers_x_in_sequence_y_counts.keys()])
+
+print("Counter test")
+for i in kmers_x_count.elements():
+  print(i)
 
 # Keep kmers that repeat a small number of times (<= repeat_threshold_within) for each sequence.
 kmers_unique_in_one_sequence = set([el[0] for el in kmers_x_in_sequence_y_counts.keys() if
