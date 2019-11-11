@@ -49,6 +49,7 @@ class Kmerator:
       self.sequence = kmer_seq
       self.kuid = kuid
       self.count = 0
+      self.location_max = 0
       self.locations = {}
       Kmerator.Kmer.kmers += 1
 
@@ -57,20 +58,23 @@ class Kmerator:
     self.min_sequences_per_kmer = min_sequences_per_kmer
     self.max_kmers_any_sequence = max_kmers_any_sequence
     self.preselected_kmers = {}
+    self.skipmap = {}
     self.selected_kmers = {}
 
   def add_kmer(self, kmer_seq, kmer_start, seqname):
     kuid = Kmerator.calculate_kuid(kmer_seq)
-    kmerlocation = Kmerator.KmerLocation(kmer_start, kuid, seqname)
-    Kmerator.kmerlocdb[kmerlocation.idx] = kmerlocation
-    if kuid  not in Kmerator.kmerdb:
-      Kmerator.kmerdb[kuid] = Kmerator.Kmer(kmer_seq, kuid)
-    Kmerator.kmerdb[kuid].count += 1
-    if kmerlocation.sequence not in Kmerator.kmerdb[kuid].locations:
-      Kmerator.kmerdb[kuid].locations[kmerlocation.sequence] = []
-    Kmerator.kmerdb[kuid].locations[kmerlocation.sequence].append(kmerlocation.idx)
-    # do the SWIGG min_alt_seqs and repeat_threshold_across check
-    self.isInRepeatThresholds(kuid)
+    if kuid not in self.skipmap:
+      kmerlocation = Kmerator.KmerLocation(kmer_start, kuid, seqname)
+      Kmerator.kmerlocdb[kmerlocation.idx] = kmerlocation
+      if kuid  not in Kmerator.kmerdb:
+        Kmerator.kmerdb[kuid] = Kmerator.Kmer(kmer_seq, kuid)
+      Kmerator.kmerdb[kuid].count += 1
+      if kmerlocation.sequence not in Kmerator.kmerdb[kuid].locations:
+        Kmerator.kmerdb[kuid].locations[kmerlocation.sequence] = []
+      Kmerator.kmerdb[kuid].locations[kmerlocation.sequence].append(kmerlocation.idx)
+      Kmerator.kmerdb[kuid].location_max = max(Kmerator.kmerdb[kuid].location_max, len(Kmerator.kmerdb[kuid].locations[kmerlocation.sequence]))
+      # do the SWIGG min_alt_seqs and repeat_threshold_across check
+      self.preselect_kmers(kuid)
 
   def search_kmers(self, sequence):
     for i in range(sequence.length()-self.kmer_len):
@@ -78,19 +82,22 @@ class Kmerator:
 
   def show(self):
     print("Found {} kmers in {} locations".format(Kmerator.kmer_count(), Kmerator.location_count()))
-    print("KmerUid", "kmer_seq", "locations", sep='\t')
     for i in Kmerator.kmerdb:
       print(Kmerator.kmerdb[i].kuid, Kmerator.kmerdb[i].sequence, sep='\t')
       for j in Kmerator.kmerdb[i].locations:
         for k in Kmerator.kmerdb[i].locations[j]:
-          print("\t\t", Kmerator.kmerlocdb[k].sequence, Kmerator.kmerlocdb[k].start, Kmerator.kmerlocdb[k].idx, Kmerator.kmerlocdb[k], sep='\t')
+          print("\t\t\t", Kmerator.kmerlocdb[k].sequence, Kmerator.kmerlocdb[k].start, Kmerator.kmerlocdb[k].idx, Kmerator.kmerlocdb[k], sep='\t')
 
-  def isInRepeatThresholds(self, kuid):
-    if (len(Kmerator.kmerdb[kuid].locations) >= self.min_sequences_per_kmer) and (len(Kmerator.kmerdb[kuid].locations) <= self.max_kmers_any_sequence):
-      self.preselected_kmers[kuid] = 0
-    else:
+  def preselect_kmers(self, kuid):
+    if Kmerator.kmerdb[kuid].location_max > self.max_kmers_any_sequence:
+      # This criteria won't change once it's reached and does not need any additional checks.
+      self.skipmap[kuid] = 0
       if kuid in self.preselected_kmers:
         self.preselected_kmers.pop(kuid)
+    else:
+      # Kmer number is less than requested for any sequence but maybe not found in the requested number of sequences.
+      if len(Kmerator.kmerdb[kuid].locations) >= self.min_sequences_per_kmer:
+        self.preselected_kmers[kuid] = 0
 
   def filter(self, max_kmers_per_sequence):
     for i in self.preselected_kmers:
