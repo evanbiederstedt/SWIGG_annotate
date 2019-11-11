@@ -41,19 +41,14 @@ required.add_argument("-o", "--out",
                     help='required, path to prefix of output file name. Two files will be created - 1. Edge file ".tsv" and 2. Graph file ".gexf" ',
                     required=True)
 
-########################################################
-# optional args:
-
-# optional.add_argument("--reg",
-#                     help="optional, .....")
-
-# parser._action_groups.append(optional)
 args = parser.parse_args()
 
 ########################################################
+
 seq_list = []
 for seqq in args.fasta:
     seq_list = seq_list + [(seqq, str(list(SeqIO.parse(seqq, "fasta"))[0].seq))]
+    
 seq_df = pd.DataFrame(seq_list).head()
 seq_df.columns=['name', 'Sequence']
 
