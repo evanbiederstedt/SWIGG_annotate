@@ -57,11 +57,6 @@ required.add_argument("-o", "--out",
 args = parser.parse_args()
 
 ########################################################
-#seq_list = []
-#for seqq in args.fasta:
-    #seq_list = seq_list + [(seqq, str(list(SeqIO.parse(seqq, "fasta"))[0].seq))]
-#seq_df = pd.DataFrame(seq_list).head()
-#seq_df.columns=['name', 'Sequence']
 
 kmerator = kmer.Kmerator(int(args.kmer_length), int(args.threshold), int(args.repeat_threshold_across))
 fp = fasta.reader.Reader()
@@ -74,12 +69,20 @@ for i in args.fasta:
 #kmerator.show()
 print("Filtering kmers", file=sys.stderr)
 kmerator.filter(int(args.repeat_threshold_within))
-print(" Selected {} kmers".format(len(kmerator.selected_kmers)), file=sys.stderr)
+print(" Selected {} kmers".format(len(kmerator.preselected_kmers)), file=sys.stderr)
 for i in kmerator.selected_kmers:
-  print(i)
+  #print(i, kmerator.kmerdb[i].sequence, end=',')
+  for j in kmerator.kmerdb[i].locations:
+    for k in kmerator.kmerdb[i].locations[j]:
+      print(i, kmerator.kmerdb[i].sequence, kmerator.kmerdb[i].count, kmerator.kmerlocdb[k].sequence, kmerator.kmerlocdb[k].start, sep=',')
 print(resource.getrusage(resource.RUSAGE_SELF))
-
 sys.exit()
+
+seq_list = []
+for seqq in args.fasta:
+    seq_list = seq_list + [(seqq, str(list(SeqIO.parse(seqq, "fasta"))[0].seq))]
+seq_df = pd.DataFrame(seq_list).head()
+seq_df.columns=['name', 'Sequence']
 
 # Length of k-mers to search for.
 k_length = int(args.kmer_length)
@@ -113,15 +116,26 @@ kmers_x_count = Counter([k[0] for k in kmers_x_in_sequence_y_counts.keys()])
 kmers_unique_in_one_sequence = set([el[0] for el in kmers_x_in_sequence_y_counts.keys() if
                     (kmers_x_in_sequence_y_counts[el] > 0) & (kmers_x_in_sequence_y_counts[el] <= repeat_threshold_within)])
 
+#print("kmers_unique_in_one_sequence")
+#for i in kmers_unique_in_one_sequence:
+  #print("kmer_uniq_in_seq:", i, sep='\t')
 # Dump kmers that are repeat too many times (> repeat_threshold_across) in any single sequence.
 kmers_repeat_too_many_times = set([el[0] for el in kmers_unique_in_one_sequence if
                     (kmers_x_in_sequence_y_counts[el] > repeat_threshold_across)])
 
+#print("kmers_too_repetitive_any_sequence")
+#for i in kmers_repeat_too_many_times:
+  #print("too_rep:", i, sep='\t')
+
+
 # Keep kmers that are conserved in >=min_alt_seqs sequences.
 kmers_approx_nonrepeat = kmers_unique_in_one_sequence.difference(kmers_repeat_too_many_times)
+print(kmers_approx_nonrepeat)
 conserved_seqs = set([el for el in kmers_approx_nonrepeat if kmers_x_count[el] >= min_alt_seqs])
 kmers_df_filt = kmers_df[[k in conserved_seqs for k in kmers_df.kmer]]
 print(str(len(kmers_df_filt)) + " conserved/nonrepeating kmers.", flush=True)
+print(kmers_df_filt)
+kmers_df_filt.to_csv(sys.stdout)
 
 # Get rid of kmers that are just right next to each other.
 print("Getting rid of direct neighbor kmers...")
@@ -172,4 +186,5 @@ with open(args.out+'.tsv') as f:
 
 nx.write_gexf(G, args.out+'.gexf')
 
+print(resource.getrusage(resource.RUSAGE_SELF))
 print("Success!", flush=True)

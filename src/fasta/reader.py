@@ -18,11 +18,11 @@ class Reader:
       if i[0] == '>':
         header = i[1:].strip()
         if seq:
-          kmerator.make_kmers(sequence.Sequence(header, seq))
+          kmerator.search_kmers(sequence.Sequence(header, seq))
           seq = ''
       else:
         seq += i.strip()
-    kmerator.make_kmers(sequence.Sequence(header, seq))
+    kmerator.search_kmers(sequence.Sequence(header, seq))
     fh.close()
 
     def __init__(self):
