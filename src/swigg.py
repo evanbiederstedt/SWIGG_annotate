@@ -111,13 +111,11 @@ print(str(len(kmers)) + " total possible k-mers of length " + str(k_length), flu
 
 ## Note: It's very important for the downstream steps that kmers_df is ordered by (alt_seq, pos_start).  If it is not read in in such a way (ie we end up parallelizing this running on GPUs or something, we will need to do:
 # kmers_df = kmers_df.sort_values(['alt_seq', 'pos_start'])
-kmers_df.to_csv(sys.stdout)
 print("Finding conserved & nonrepeating kmers...")
 kmers_x_in_sequence_y = zip(kmers_df.kmer, kmers_df.alt_seq)
 test_kmers_x_in_sequence_y = zip(kmers_df.kmer, kmers_df.alt_seq)
-print("Zip test")
 for i in list(test_kmers_x_in_sequence_y):
-  print(i)
+  print("Test kmers in seq:\t", i)
 # Counts of (alt_seq, kmer) combos -- how many times kmer appears in alt_seq).
 kmers_x_in_sequence_y_counts = Counter(kmers_x_in_sequence_y)
 # How many sequences kmer appears in.
@@ -125,7 +123,7 @@ kmers_x_count = Counter([k[0] for k in kmers_x_in_sequence_y_counts.keys()])
 
 print("Counter test")
 for i in kmers_x_count.elements():
-  print(i)
+  print("Counter:\t", i)
 
 # Keep kmers that repeat a small number of times (<= repeat_threshold_within) for each sequence.
 kmers_unique_in_one_sequence = set([el[0] for el in kmers_x_in_sequence_y_counts.keys() if
@@ -136,15 +134,15 @@ kmers_repeat_too_many_times = set([el[0] for el in kmers_unique_in_one_sequence 
 
 print("uniq in one")
 for i in kmers_unique_in_one_sequence:
-  print(i)
+  print("uinq_in_one:\t", i)
 print("too repetitive")
 for i in kmers_repeat_too_many_times:
-  print(i)
+  print("too repetitive:\t", i)
 # Keep kmers that are conserved in >=min_alt_seqs sequences.
 kmers_approx_nonrepeat = kmers_unique_in_one_sequence.difference(kmers_repeat_too_many_times)
 print("OK repetitive-repeat")
 for i in kmers_approx_nonrepeat:
-  print(i)
+  print("OK repeat:\t", i)
 conserved_seqs = set([el for el in kmers_approx_nonrepeat if kmers_x_count[el] >= min_alt_seqs])
 kmers_df_filt = kmers_df[[k in conserved_seqs for k in kmers_df.kmer]]
 print(str(len(kmers_df_filt)) + " conserved/nonrepeating kmers.", flush=True)
