@@ -58,31 +58,31 @@ args = parser.parse_args()
 
 ########################################################
 
-#kmerator = kmer.Kmerator(int(args.kmer_length), int(args.threshold), int(args.repeat_threshold_across))
-#fp = fasta.reader.Reader()
-#print("Finding kmers", file=sys.stderr)
-#for i in args.fasta:
-  #print(" in {}".format(i), file=sys.stderr)
-  #fp.parse(i, kmerator)
-  #print("Found {} kmers in {} locations".format(kmerator.kmer_count(), kmerator.location_count()), file=sys.stderr)
-  #print(" Preselected {} kmers".format(len(kmerator.preselected_kmers)), file=sys.stderr)
-#kmerator.show()
-#print("Filtering kmers", file=sys.stderr)
-#kmerator.filter(int(args.repeat_threshold_within))
+kmerator = kmer.Kmerator(int(args.kmer_length), int(args.threshold), int(args.repeat_threshold_across))
+fp = fasta.reader.Reader()
+print("Finding kmers", file=sys.stderr)
+for i in args.fasta:
+  print(" in {}".format(i), file=sys.stderr)
+  fp.parse(i, kmerator)
+  print("Found {} kmers in {} locations".format(kmerator.kmer_count(), kmerator.location_count()), file=sys.stderr)
+  print(" Preselected {} kmers".format(len(kmerator.preselected_kmers)), file=sys.stderr)
+kmerator.show()
+print("Filtering kmers", file=sys.stderr)
+kmerator.filter(int(args.repeat_threshold_within))
 #print(" Selected {} kmers".format(len(kmerator.selected_kmers)), file=sys.stderr)
 #tot = 0
 #for i in kmerator.selected_kmers:
   #print(i, kmerator.kmerdb[i].sequence, kmerator.kmerdb[i].count, sep=',')
-  ##for j in kmerator.kmerdb[i].locations:
-    ##tot += len(kmerator.kmerdb[i].locations)
-    ###for k in kmerator.kmerdb[i].locations[j]:
-      ##print(i, kmerator.kmerdb[i].sequence, kmerator.kmerdb[i].count, kmerator.kmerlocdb[k].sequence, kmerator.kmerlocdb[k].start, sep=',')
-##print(tot)
-#print("Ignored kmers: {}".format(len(kmerator.skipmap)))
-#for i in kmerator.skipmap:
-  #print(i, kmerator.kmerdb[i].sequence)
-#print(resource.getrusage(resource.RUSAGE_SELF))
-#sys.exit()
+  #for j in kmerator.kmerdb[i].locations:
+    #tot += len(kmerator.kmerdb[i].locations)
+    ##for k in kmerator.kmerdb[i].locations[j]:
+      #print(i, kmerator.kmerdb[i].sequence, kmerator.kmerdb[i].count, kmerator.kmerlocdb[k].sequence, kmerator.kmerlocdb[k].start, sep=',')
+#print(tot)
+print("Ignored kmers: {}".format(len(kmerator.skipmap)))
+for i in kmerator.skipmap:
+  print(i, kmerator.kmerdb[i].sequence)
+print(resource.getrusage(resource.RUSAGE_SELF))
+sys.exit()
 
 seq_list = []
 for seqq in args.fasta:
@@ -153,6 +153,8 @@ kmers_df_filt.to_csv(sys.stdout)
 # Get rid of kmers that are just right next to each other.
 print("Getting rid of direct neighbor kmers...")
 kmers_df_filt['order'] = range(len(kmers_df_filt))
+kmers_df_filt.to_csv(sys.stdout)
+print(kmers_df_filt.alt_seq.values[1:], kmers_df_filt.alt_seq[:-1])
 kmer_grouped_df_expanded = kmers_df_filt[:-1][(kmers_df_filt.pos_start.values[1:]-kmers_df_filt.pos_start.values[:-1]>k_length) &
                                        (kmers_df_filt.alt_seq.values[1:]==kmers_df_filt.alt_seq[:-1])]
 kmer_grouped_df_expanded.head()

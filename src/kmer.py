@@ -11,6 +11,7 @@ import os
 import sys
 import hashlib
 import random
+import cProfile
 
 class Kmerator:
 
@@ -33,13 +34,18 @@ class Kmerator:
   class KmerLocation:
 
     count = 0
+    idx = 0
 
     def __init__(self, start, kuid, sequence):
       self.start = start
       self.kuid = kuid
       self.sequence = sequence
-      self.idx = Kmerator.KmerLocation.count
+      self.idx = Kmerator.KmerLocation.idx
+      Kmerator.KmerLocation.idx += 1
       Kmerator.KmerLocation.count += 1
+
+    def end(self):
+      return self.start + Kmerator.kmerdb[self.kuid].length() - 1
 
   class Kmer:
 
@@ -51,7 +57,11 @@ class Kmerator:
       self.count = 0
       self.location_max = 0
       self.locations = {}
+      self.seqrep = 1
       Kmerator.Kmer.kmers += 1
+
+    def length(self):
+      return self.seqrep * len(self.sequence)
 
   def __init__(self, kmer_len, min_sequences_per_kmer, max_kmers_any_sequence):
     self.kmer_len = int(kmer_len)
@@ -62,19 +72,68 @@ class Kmerator:
     self.selected_kmers = {}
 
   def add_kmer(self, kmer_seq, kmer_start, seqname):
+    """
+    - Test if kmer already exists
+    - Prepare location
+    - Test if kmer has direct neighbor
+       Merge if yes
+    - Add kmer and location to db
+    """
     kuid = Kmerator.calculate_kuid(kmer_seq)
     if kuid not in self.skipmap:
+      kmer = Kmerator.kmerdb.get(kuid, None)
+      if not kmer:
+        kmer = Kmerator.Kmer(kmer_seq, kuid)
       kmerlocation = Kmerator.KmerLocation(kmer_start, kuid, seqname)
+      lh_neighbor_loc = self.find_neighbor_location(kmer, kmerlocation)
+      # if kmer has neighbor, merge and proceed with merged kmer
+      if lh_neighbor_loc:
+        kmer = self.merge_neighbor_kmer(kmer, kmerlocation, lh_neighbor_loc)
+        kmerlocation = Kmerator.KmerLocation(lh_neighbor_loc.start, kmer.kuid, lh_neighbor_loc.sequence)
+        Kmerator.KmerLocation.count -= 1
+      if kmerlocation.sequence not in kmer.locations:
+        kmer.locations[kmerlocation.sequence] = []
+      kmer.locations[kmerlocation.sequence].append(kmerlocation.idx)
+      kmer.count += 1
+      if kmer.kuid not in Kmerator.kmerdb:
+        Kmerator.kmerdb[kmer.kuid] = kmer
       Kmerator.kmerlocdb[kmerlocation.idx] = kmerlocation
-      if kuid  not in Kmerator.kmerdb:
-        Kmerator.kmerdb[kuid] = Kmerator.Kmer(kmer_seq, kuid)
-      Kmerator.kmerdb[kuid].count += 1
-      if kmerlocation.sequence not in Kmerator.kmerdb[kuid].locations:
-        Kmerator.kmerdb[kuid].locations[kmerlocation.sequence] = []
-      Kmerator.kmerdb[kuid].locations[kmerlocation.sequence].append(kmerlocation.idx)
-      Kmerator.kmerdb[kuid].location_max = max(Kmerator.kmerdb[kuid].location_max, len(Kmerator.kmerdb[kuid].locations[kmerlocation.sequence]))
+      kmer.location_max = max(kmer.location_max, len(kmer.locations[kmerlocation.sequence]))
       # do the SWIGG min_alt_seqs and repeat_threshold_across check
-      self.preselect_kmers(kuid)
+      self.preselect_kmer(kmer)
+
+  def find_neighbor_location(self, kmer, location):
+    # If we haven't seen the kmer on
+    if not location.sequence in kmer.locations:
+      return None
+    if kmer.locations[location.sequence]:
+      print(kmer.locations[location.sequence])
+      # Fetch latest added location of kmer on sequence
+      prev_kmer_loc =  Kmerator.kmerlocdb[kmer.locations[location.sequence][-1]]
+      print("N-Test:\nkmer0: {}\t{}\t{}\t{}\nkmer1: {}\t{}\t{}\t{}".format(prev_kmer_loc.kuid,
+                                                                          prev_kmer_loc.start,
+                                                                          prev_kmer_loc.end(),
+                                                                          prev_kmer_loc.sequence,
+                                                                          location.kuid,
+                                                                          location.start,
+                                                                          location.end(),
+                                                                          location.sequence))
+      if location.start - prev_kmer_loc.end() == 1:
+        return prev_kmer_loc
+    return None
+
+  def merge_neighbor_kmer(self, kmer, location, lh_neighbor_loc):
+    merged_kmer = Kmerator.Kmer(kmer.sequence, Kmerator.calculate_kuid(''.join([kmer.sequence, kmer.sequence])))
+    merged_kmer.seqrep += 1
+    if Kmerator.kmerdb[kmer.kuid].count - 1 == 0:
+      Kmerator.kmerdb.pop(kmer.kuid)
+      print("Rm kmer:",  kmer.kuid)
+      self.preselected_kmers.pop(kmer.kuid)
+    else:
+      Kmerator.kmerdb[kmer.kuid].count -= 1
+    Kmerator.Kmer.kmers -= 1
+    print("Merged: {} into {}".format(kmer.kuid, merged_kmer.kuid))
+    return merged_kmer
 
   def search_kmers(self, sequence):
     for i in range(sequence.length()-self.kmer_len):
@@ -88,16 +147,17 @@ class Kmerator:
         for k in Kmerator.kmerdb[i].locations[j]:
           print("\t\t\t", Kmerator.kmerlocdb[k].sequence, Kmerator.kmerlocdb[k].start, Kmerator.kmerlocdb[k].idx, Kmerator.kmerlocdb[k], sep='\t')
 
-  def preselect_kmers(self, kuid):
-    if Kmerator.kmerdb[kuid].location_max > self.max_kmers_any_sequence:
+  def preselect_kmer(self, kmer):
+    if kmer.location_max > self.max_kmers_any_sequence:
       # This criteria won't change once it's reached and does not need any additional checks.
-      self.skipmap[kuid] = 0
-      if kuid in self.preselected_kmers:
-        self.preselected_kmers.pop(kuid)
+      self.skipmap[kmer.kuid] = 0
+      # rm kmers from db
+      if kmer.kuid in self.preselected_kmers:
+        self.preselected_kmers.pop(kmer.kuid)
     else:
       # Kmer number is less than requested for any sequence but maybe not found in the requested number of sequences.
-      if len(Kmerator.kmerdb[kuid].locations) >= self.min_sequences_per_kmer:
-        self.preselected_kmers[kuid] = 0
+      if len(kmer.locations) >= self.min_sequences_per_kmer:
+        self.preselected_kmers[kmer.kuid] = 0
 
   def filter(self, max_kmers_per_sequence):
     for i in self.preselected_kmers:
