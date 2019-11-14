@@ -18,6 +18,8 @@ class Kmerator:
   kmerdb = {}
   kmerlocdb = {}
   seqdb = {}
+  superkmer = {}
+  locdb = {}
 
   @staticmethod
   def calculate_kuid(kmer_seq):
@@ -25,7 +27,7 @@ class Kmerator:
 
   @staticmethod
   def kmer_count():
-    return Kmerator.Kmer.kmers
+    return len(Kmerator.kmerdb)
 
   @staticmethod
   def location_count():
@@ -33,7 +35,6 @@ class Kmerator:
 
   class KmerLocation:
 
-    count = 0
     idx = 0
 
     def __init__(self, start, kuid, sequence):
@@ -41,15 +42,13 @@ class Kmerator:
       self.kuid = kuid
       self.sequence = sequence
       self.idx = Kmerator.KmerLocation.idx
+      self.superkmer = None
       Kmerator.KmerLocation.idx += 1
-      Kmerator.KmerLocation.count += 1
 
     def end(self):
       return self.start + Kmerator.kmerdb[self.kuid].length() - 1
 
   class Kmer:
-
-    kmers = 0
 
     def __init__(self, kmer_seq, kuid):
       self.sequence = kmer_seq
@@ -57,11 +56,9 @@ class Kmerator:
       self.count = 0
       self.location_max = 0
       self.locations = {}
-      self.seqrep = 1
-      Kmerator.Kmer.kmers += 1
 
     def length(self):
-      return self.seqrep * len(self.sequence)
+      return len(self.sequence)
 
   def __init__(self, kmer_len, min_sequences_per_kmer, max_kmers_any_sequence):
     self.kmer_len = int(kmer_len)
@@ -81,71 +78,70 @@ class Kmerator:
     """
     kuid = Kmerator.calculate_kuid(kmer_seq)
     if kuid not in self.skipmap:
-      kmer = Kmerator.kmerdb.get(kuid, None)
-      if not kmer:
-        kmer = Kmerator.Kmer(kmer_seq, kuid)
-      kmerlocation = Kmerator.KmerLocation(kmer_start, kuid, seqname)
-      lh_neighbor_loc = self.find_neighbor_location(kmer, kmerlocation)
-      # if kmer has neighbor, merge and proceed with merged kmer
-      if lh_neighbor_loc:
-        kmer = self.merge_neighbor_kmer(kmer, kmerlocation, lh_neighbor_loc)
-        kmerlocation = Kmerator.KmerLocation(lh_neighbor_loc.start, kmer.kuid, lh_neighbor_loc.sequence)
-        Kmerator.KmerLocation.count -= 1
-      if kmerlocation.sequence not in kmer.locations:
-        kmer.locations[kmerlocation.sequence] = []
-      kmer.locations[kmerlocation.sequence].append(kmerlocation.idx)
-      kmer.count += 1
-      if kmer.kuid not in Kmerator.kmerdb:
-        Kmerator.kmerdb[kmer.kuid] = kmer
-      Kmerator.kmerlocdb[kmerlocation.idx] = kmerlocation
-      kmer.location_max = max(kmer.location_max, len(kmer.locations[kmerlocation.sequence]))
+      kmer = self.get_kmer(kuid, kmer_seq)
+      location = self.get_kmer_location(kmer_start, kmer, seqname)
+      neighbor_loc = self.find_neighbor_loc(location, kmer)
+      if neighbor_loc:
+        print("Neighbor kmer", neighbor_loc.start, neighbor_loc.end(), neighbor_loc.kuid, location.start, location.end(), location.kuid)
+        self.adjust_superkmer(kmer, location, neighbor_loc)
+      Kmerator.kmerlocdb[location.idx] = location
+      kmer.locations[location.sequence].append(location.idx)
+      kmer.location_max = max(kmer.location_max, len(kmer.locations[location.sequence]))
+      if location.superkmer:
+        print(location.superkmer, location.end())
       # do the SWIGG min_alt_seqs and repeat_threshold_across check
-      self.preselect_kmer(kmer)
+      #self.preselect_kmer(kmer)
 
-  def find_neighbor_location(self, kmer, location):
-    # If we haven't seen the kmer on
-    if not location.sequence in kmer.locations:
+  def get_kmer(self, kuid, kmer_seq):
+    if kuid not in Kmerator.kmerdb:
+      Kmerator.kmerdb[kuid] = Kmerator.Kmer(kmer_seq, kuid)
+    Kmerator.kmerdb[kuid].count += 1
+    return Kmerator.kmerdb[kuid]
+
+  def get_kmer_location(self, kmer_start, kmer, seqname):
+    kmerlocation = Kmerator.KmerLocation(kmer_start, kmer.kuid, seqname)
+    if kmerlocation.sequence not in Kmerator.locdb:
+      Kmerator.locdb[kmerlocation.sequence] = {}
+    Kmerator.locdb[kmerlocation.sequence][kmerlocation.start] = kmerlocation
+    if kmerlocation.sequence not in kmer.locations:
+      kmer.locations[kmerlocation.sequence] = []
+    return kmerlocation
+
+  def adjust_superkmer(self, kmer, location, neighbor_loc):
+    """Add new neigbbor (start new superkmer) or expand existing """
+    if neighbor_loc.superkmer is None:  # start superkmer with neighbor_loc as start
+      neighbor_loc.superkmer = len(Kmerator.superkmer)
+      location.superkmer = neighbor_loc.superkmer
+      Kmerator.superkmer[location.superkmer] = [neighbor_loc.start, location.end()]
+      print("New superkmer: from {} to {}".format(Kmerator.superkmer[location.superkmer][0], Kmerator.superkmer[location.superkmer][1]))
+    else: #neighbor_loc is already part of a superkmer
+      print("Extend superkmer {} with {} to {}".format(neighbor_loc.superkmer, neighbor_loc.idx, location.end()))
+      location.superkmer = neighbor_loc.superkmer
+      Kmerator.superkmer[location.superkmer][1] = location.end()
+      print("Coords for {}: {} to {}".format(neighbor_loc.superkmer, Kmerator.superkmer[neighbor_loc.superkmer][0], Kmerator.superkmer[location.superkmer][1]))
+
+  def find_neighbor_loc(self, location, kmer):
+    # test if kmer is part of a superkmer, i.e. more than two neighbors
+    # find first neighbor
+    if len(Kmerator.locdb[location.sequence]) < 2:
       return None
-    if kmer.locations[location.sequence]:
-      print(kmer.locations[location.sequence])
-      # Fetch latest added location of kmer on sequence
-      prev_kmer_loc =  Kmerator.kmerlocdb[kmer.locations[location.sequence][-1]]
-      print("N-Test:\nkmer0: {}\t{}\t{}\t{}\nkmer1: {}\t{}\t{}\t{}".format(prev_kmer_loc.kuid,
-                                                                          prev_kmer_loc.start,
-                                                                          prev_kmer_loc.end(),
-                                                                          prev_kmer_loc.sequence,
-                                                                          location.kuid,
-                                                                          location.start,
-                                                                          location.end(),
-                                                                          location.sequence))
-      if location.start - prev_kmer_loc.end() == 1:
-        return prev_kmer_loc
+    if location.start % self.kmer_len != 0:
+      return None
+    if Kmerator.locdb[location.sequence][(location.start-self.kmer_len)].kuid == location.kuid:
+      return Kmerator.locdb[location.sequence][(location.start-self.kmer_len)]
     return None
-
-  def merge_neighbor_kmer(self, kmer, location, lh_neighbor_loc):
-    merged_kmer = Kmerator.Kmer(kmer.sequence, Kmerator.calculate_kuid(''.join([kmer.sequence, kmer.sequence])))
-    merged_kmer.seqrep += 1
-    if Kmerator.kmerdb[kmer.kuid].count - 1 == 0:
-      Kmerator.kmerdb.pop(kmer.kuid)
-      print("Rm kmer:",  kmer.kuid)
-      self.preselected_kmers.pop(kmer.kuid)
-    else:
-      Kmerator.kmerdb[kmer.kuid].count -= 1
-    Kmerator.Kmer.kmers -= 1
-    print("Merged: {} into {}".format(kmer.kuid, merged_kmer.kuid))
-    return merged_kmer
 
   def search_kmers(self, sequence):
     for i in range(sequence.length()-self.kmer_len):
       self.add_kmer(sequence.sequence[i:(i+self.kmer_len)], i, sequence.header)
 
   def show(self):
-    print("Found {} kmers in {} locations".format(Kmerator.kmer_count(), Kmerator.location_count()))
+    print("Found {} kmers in {} locations".format(len(Kmerator.kmerdb), len(Kmerator.locdb)))
     for i in Kmerator.kmerdb:
       print(Kmerator.kmerdb[i].kuid, Kmerator.kmerdb[i].sequence, sep='\t')
       for j in Kmerator.kmerdb[i].locations:
         for k in Kmerator.kmerdb[i].locations[j]:
-          print("\t\t\t", Kmerator.kmerlocdb[k].sequence, Kmerator.kmerlocdb[k].start, Kmerator.kmerlocdb[k].idx, Kmerator.kmerlocdb[k], sep='\t')
+          print("\t\t\t", Kmerator.kmerlocdb[k].idx, Kmerator.kmerlocdb[k].start, Kmerator.kmerlocdb[k].end(), Kmerator.kmerlocdb[k].superkmer,  Kmerator.kmerlocdb[k].sequence, Kmerator.kmerlocdb[k], sep='\t')
 
   def preselect_kmer(self, kmer):
     if kmer.location_max > self.max_kmers_any_sequence:
