@@ -64,26 +64,20 @@ print("Finding kmers", file=sys.stderr)
 for i in args.fasta:
   print(" in {}".format(i), file=sys.stderr)
   fp.parse(i, kmerator)
-  #print("Found {} kmers in {} locations".format(kmerator.kmer_count(), kmerator.location_count()), file=sys.stderr)
+  print("Found {} kmers / {} superkmers in {} locations".format(kmerator.kmer_count(), kmerator.superkmer_count(), kmerator.location_count()), file=sys.stderr)
   print(" Preselected {} kmers".format(len(kmerator.preselected_kmers)), file=sys.stderr)
-kmerator.show()
+#kmerator.show_locations()
+#kmerator.show_kmers()
 for i in kmerator.superkmer:
+  #print(i, kmerator.locdb[kmerator.superkmer[i][0]].start, kmerator.locdb[kmerator.superkmer[i][1]].end())
   print(i, kmerator.superkmer[i])
 print("Filtering kmers", file=sys.stderr)
 #kmerator.filter(int(args.repeat_threshold_within))
 #print(" Selected {} kmers".format(len(kmerator.selected_kmers)), file=sys.stderr)
-#tot = 0
-#for i in kmerator.selected_kmers:
-  #print(i, kmerator.kmerdb[i].sequence, kmerator.kmerdb[i].count, sep=',')
-  #for j in kmerator.kmerdb[i].locations:
-    #tot += len(kmerator.kmerdb[i].locations)
-    ##for k in kmerator.kmerdb[i].locations[j]:
-      #print(i, kmerator.kmerdb[i].sequence, kmerator.kmerdb[i].count, kmerator.kmerlocdb[k].sequence, kmerator.kmerlocdb[k].start, sep=',')
-#print(tot)
 #print("Ignored kmers: {}".format(len(kmerator.skipmap)))
 #for i in kmerator.skipmap:
   #print(i, kmerator.kmerdb[i].sequence)
-#print(resource.getrusage(resource.RUSAGE_SELF))
+print(resource.getrusage(resource.RUSAGE_SELF))
 sys.exit()
 
 seq_list = []
