@@ -1,4 +1,6 @@
-Note: this is a temporary fork for convenience, in relation to https://github.com/ncBI-codeathons/virus_graphs
+[![Build Status](https://api.travis-ci.org/evanbiederstedt/SWIGG_annotate.svg?branch=develop)](https://travis-ci.org/evanbiederstedt/SWIGG_annotate)
+
+**Note: this is a temporary fork for convenience, in relation to https://github.com/ncBI-codeathons/virus_graphs**
 
 <img src="documentation/images/hiv_graph.jpg" align="left" height="150" width="150" ></a> 
 # SWIGG - SWIft Genomes in a Graph
@@ -31,6 +33,7 @@ We can construct graph genomes of a small portion of the genome that can still l
   - numpy (1.16.4)
   - pandas (0.24.2)
   - biopython (1.74)
+  - networkx (2.4)
   - argparse
   - collections
 - Gephi
