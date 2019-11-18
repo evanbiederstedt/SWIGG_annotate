@@ -1,4 +1,4 @@
-[![Build Status](https://api.travis-ci.org/evanbiederstedt/SWIGG_annotate.svg?branch=develop)](https://travis-ci.org/evanbiederstedt/SWIGG_annotate)
+[![Build Status](https://api.travis-ci.org/evanbiederstedt/SWIGG_annotate.svg?branch=master)](https://travis-ci.org/evanbiederstedt/SWIGG_annotate)
 
 **Note: this is a temporary fork for convenience, in relation to https://github.com/ncBI-codeathons/virus_graphs**
 
