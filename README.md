@@ -31,6 +31,7 @@ We can construct graph genomes of a small portion of the genome that can still l
   - numpy (1.16.4)
   - pandas (0.24.2)
   - biopython (1.74)
+  - networkx (2.4)
   - argparse
   - collections
 - Gephi
