@@ -13,7 +13,7 @@ import networkx as nx
 
 
 import fasta.reader
-import kmer
+import kmerator
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter, \
 description="""
@@ -58,7 +58,7 @@ args = parser.parse_args()
 
 ########################################################
 
-kmerator = kmer.Kmerator(int(args.kmer_length), int(args.threshold), int(args.repeat_threshold_across))
+kmerator = kmerator.Kmerator(int(args.kmer_length), int(args.threshold), int(args.repeat_threshold_across))
 fp = fasta.reader.Reader()
 print("Finding kmers", file=sys.stderr)
 for i in args.fasta:
@@ -66,13 +66,13 @@ for i in args.fasta:
   fp.parse(i, kmerator)
   print("Found {} kmers / {} superkmers in {} locations".format(kmerator.kmer_count(), kmerator.superkmer_count(), kmerator.location_count()), file=sys.stderr)
   print(" Preselected {} kmers".format(len(kmerator.preselected_kmers)), file=sys.stderr)
-#kmerator.show_locations()
+kmerator.show_locations()
 #kmerator.show_kmers()
 for i in kmerator.superkmer:
   #print(i, kmerator.locdb[kmerator.superkmer[i][0]].start, kmerator.locdb[kmerator.superkmer[i][1]].end())
   print(i, kmerator.superkmer[i])
-print("Filtering kmers", file=sys.stderr)
-#kmerator.filter(int(args.repeat_threshold_within))
+print("Filtering kmers")
+kmerator.filter(int(args.repeat_threshold_within))
 #print(" Selected {} kmers".format(len(kmerator.selected_kmers)), file=sys.stderr)
 #print("Ignored kmers: {}".format(len(kmerator.skipmap)))
 #for i in kmerator.skipmap:
@@ -150,19 +150,25 @@ kmers_df_filt.to_csv(sys.stdout)
 print("Getting rid of direct neighbor kmers...")
 kmers_df_filt['order'] = range(len(kmers_df_filt))
 kmers_df_filt.to_csv(sys.stdout)
-print(kmers_df_filt.alt_seq.values[1:], kmers_df_filt.alt_seq[:-1])
 kmer_grouped_df_expanded = kmers_df_filt[:-1][(kmers_df_filt.pos_start.values[1:]-kmers_df_filt.pos_start.values[:-1]>k_length) &
                                        (kmers_df_filt.alt_seq.values[1:]==kmers_df_filt.alt_seq[:-1])]
-kmer_grouped_df_expanded.head()
+print("BP: expand")
+kmer_grouped_df_expanded.to_csv(sys.stdout)
 print(str(len(kmer_grouped_df_expanded)) + " distinct kmers.", flush=True)
 
 # Turn into edge list.
 print("Computing edges", flush=True)
 edges = dict()
 for i in range(1,len(kmer_grouped_df_expanded)):
-    if kmer_grouped_df_expanded.iloc[i-1].alt_seq==kmer_grouped_df_expanded.iloc[i].alt_seq:
-        edges[(kmer_grouped_df_expanded.iloc[i-1].alt_seq, kmer_grouped_df_expanded.iloc[i-1].pos_start, kmer_grouped_df_expanded.iloc[i-1].kmer,
-               kmer_grouped_df_expanded.iloc[i].pos_start, kmer_grouped_df_expanded.iloc[i].kmer)] = 0
+  print(i-1, kmer_grouped_df_expanded.iloc[i-1].alt_seq, kmer_grouped_df_expanded.iloc[i-1].pos_start, kmer_grouped_df_expanded.iloc[i-1].kmer, sep='\t')
+  print(i,kmer_grouped_df_expanded.iloc[i].alt_seq, kmer_grouped_df_expanded.iloc[i].pos_start, kmer_grouped_df_expanded.iloc[i].kmer, sep='\t')
+  if kmer_grouped_df_expanded.iloc[i-1].alt_seq==kmer_grouped_df_expanded.iloc[i].alt_seq:
+    edges[(kmer_grouped_df_expanded.iloc[i-1].alt_seq, kmer_grouped_df_expanded.iloc[i-1].pos_start, kmer_grouped_df_expanded.iloc[i-1].kmer,
+              kmer_grouped_df_expanded.iloc[i].pos_start, kmer_grouped_df_expanded.iloc[i].kmer)] = 0
+    print("selected")
+
+for i in edges:
+  print(i, edges[i])
 
 # Convert to data frame and compute distance.
 edges_df = pd.DataFrame(list(edges))

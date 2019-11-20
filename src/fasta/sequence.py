@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 #  -------------------------------------------------------------------------------
 #  \author Jan P Buchmann <jan.buchmann@sydney.edu.au>
 #  \copyright 2019 The University of Sydney
