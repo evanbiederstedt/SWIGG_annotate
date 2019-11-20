@@ -11,7 +11,7 @@ class KmerLocation:
 
   def __init__(self, start, sequence, kmer):
     self.start = start
-    self.end = kmer.length()
+    self.end = start + kmer.length() -1
     self.kuid = kmer.kuid
     self.sequence = sequence
     self.idx = KmerLocation.idx
