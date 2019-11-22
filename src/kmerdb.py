@@ -59,9 +59,21 @@ class KmerDb:
       k.locations[location] = []
     return k
 
-  def new_kmer_location(self, kmer_start, kuid, seqname):
+  def new_location(self, kmer_start, kuid, seqname):
     """
-    Return a new location for a kmer. All kmer locations are indexed in
+    Return a new location for a kmer.
+
+    :param int kmer_start: location start
+    :param hash kuid: Kmer hash
+    :param seqname str: sequence name on which the kmer was found
+    :return: kmer location
+    :rtype: kmerloc.Location
+    """
+    return kmerloc.KmerLocation(kmer_start, kuid, seqname)
+
+  def add_kmer_location(self, location):
+    """
+    Add a new location for a kmer. All kmer locations are indexed in
     KmerDb.locations. Locations per sequence are referenced as
     start_coordinate:index in KmerDb.sequence_locations.
     KmerDb.locations indices are generated  automatically and not related to
@@ -73,13 +85,22 @@ class KmerDb:
     :return: kmer location
     :rtype: kmerloc.Location
     """
-    location = kmerloc.KmerLocation(kmer_start, kuid, seqname)
     KmerDb.locations[location.idx] = location
     if location.sequence not in KmerDb.sequence_locations:
       KmerDb.sequence_locations[location.sequence] = {}
     KmerDb.sequence_locations[location.sequence][location.start] = location.idx
-    return location
 
+
+  def remove_locations(self, locations):
+    """
+    Remove locations. WIP
+
+    :param list locations: location indices
+    :return: kmer location
+    :rtype: kmerloc.Location
+    """
+    print(locations)
+    #return location
 
   def get_location_by_idx(self, idx):
     """
@@ -176,11 +197,11 @@ class KmerDb:
     return KmerDb.locations[KmerDb.superkmers[superkmer_idx][1]]
 
   def remove_superkmer(self, superkmer_idx):
-    #print(superkmer_idx, KmerDb.superkmers)
     KmerDb.superkmers.pop(superkmer_idx, None)
 
   def remove_kmer(self, kmer):
-    """Remove a kmer form the database. It has to be removed from all dicts"""
+    """Remove a kmer form the database. It has to be removed from all dicts.
+    Rather inefficient so far."""
     kmer = KmerDb.kmers.pop(kmer.kuid)
     for i in kmer.locations:
       seqlocs = kmer.locations[i]
@@ -194,13 +215,23 @@ class KmerDb:
           #print("Removing superkmer {}".format(loc.superkmer))
           self.remove_superkmer(loc.superkmer)
 
-  def show_kmers(self):
-    for i in KmerDb.kmers:
-      print(KmerDb.kmers[i].kuid, KmerDb.kmers[i].sequence, sep='\t')
-      for j in KmerDb.kmers[i].locations:
-        locs = KmerDb.kmers[i].locations[j]
-        for k in self.get_location_by_indices(locs):
-          print("\t", k.idx, k.start, k.end, k.superkmer, k.sequence,sep='\t')
+  def show_kmers(self, kmers=None):
+    "Print kmer to STDOUT."
+    if kmers is not None:
+      for i in KmerDb.kmers:
+        if i in kmers:
+          print(KmerDb.kmers[i].kuid, KmerDb.kmers[i].sequence, sep='\t')
+          for j in KmerDb.kmers[i].locations:
+            locs = KmerDb.kmers[i].locations[j]
+            for k in self.get_location_by_indices(locs):
+              print("\t", k.idx, k.start, k.end, k.superkmer, k.sequence,sep='\t')
+    else:
+      for i in KmerDb.kmers:
+        print(KmerDb.kmers[i].kuid, KmerDb.kmers[i].sequence, sep='\t')
+        for j in KmerDb.kmers[i].locations:
+          locs = KmerDb.kmers[i].locations[j]
+          for k in self.get_location_by_indices(locs):
+            print("\t", k.idx, k.start, k.end, k.superkmer, k.sequence,sep='\t')
 
   def show_superkmers(self):
     for i in KmerDb.superkmers:
@@ -208,3 +239,20 @@ class KmerDb:
       skmer_end = self.get_superkmer_end(i)
       kmer = KmerDb.kmers[skmer_start.kuid]
       print(i, kmer.kuid,  kmer.sequence, skmer_start.idx, skmer_start.start, skmer_end.idx, skmer_end.end)
+
+  def dump_kmers(self, fout='kmer.dump', kmers=None):
+    fh = open(fout, 'w')
+    for i in KmerDb.kmers:
+      if kmers and i in kmers:
+        fh.write("{}\t{}\t{}".format(KmerDb.kmers[i].kuid, KmerDb.kmers[i].sequence, KmerDb.kmers[i].count))
+        for j in KmerDb.kmers[i].locations:
+          locs = KmerDb.kmers[i].locations[j]
+          for k in self.get_location_by_indices(locs):
+            fh.write("\t{}\t{}\t{}\t{}\t{}\n".format(k.idx, k.start, k.end, k.superkmer, k.sequence))
+      else:
+        fh.write("{}\t{}\t{}\n".format(KmerDb.kmers[i].kuid, KmerDb.kmers[i].sequence, KmerDb.kmers[i].count))
+        for j in KmerDb.kmers[i].locations:
+          locs = KmerDb.kmers[i].locations[j]
+          for k in self.get_location_by_indices(locs):
+            fh.write("\t{}\t{}\t{}\t{}\t{}\n".format(k.idx, k.start, k.end, k.superkmer, k.sequence))
+    fh.close()

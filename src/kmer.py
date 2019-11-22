@@ -21,3 +21,9 @@ class Kmer:
   def add_location(self, location):
     self.locations[location.sequence].append(location.idx)
     self.location_max_count = max(self.location_max_count, len(self.locations[location.sequence]))
+
+  def get_locations(self):
+    return [self.locations[x] for x in self.locations]
+
+  def sequence_count(self):
+    return len(self.locations)

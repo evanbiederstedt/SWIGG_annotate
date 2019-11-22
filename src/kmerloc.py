@@ -9,7 +9,7 @@ class KmerLocation:
 
   idx = 0
 
-  def __init__(self, start, sequence, kmer):
+  def __init__(self, sequence, start, kmer):
     self.start = start
     self.end = start + kmer.length() -1
     self.kuid = kmer.kuid
@@ -17,6 +17,3 @@ class KmerLocation:
     self.idx = KmerLocation.idx
     self.superkmer = None
     KmerLocation.idx += 1
-
-  #def end(self):
-    #return self.start + Kmerator.kmerdb[self.kuid].length() - 1
